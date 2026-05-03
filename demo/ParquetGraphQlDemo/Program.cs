@@ -1,16 +1,17 @@
+using DuckDB.EFCore.Extensions;
 using DuckDB.NET.Data;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-var parquetRoot = Path.Combine(builder.Environment.ContentRootPath, "data");
+var parquetRoot = System.IO.Path.Combine(builder.Environment.ContentRootPath, "data");
 Directory.CreateDirectory(parquetRoot);
 
 await DemoDataSeeder.SeedAsync(parquetRoot);
 
-builder.Services.AddSingleton(new DemoOptions { ParquetRoot = parquetRoot });
-
-builder.Services.AddDbContextFactory<DemoDbContext>((sp, options) =>
+        var customersFile = System.IO.Path.Combine(parquetRoot, "customers.parquet");
+        var ordersFile = System.IO.Path.Combine(parquetRoot, "orders.parquet");
+        var orderLinesFile = System.IO.Path.Combine(parquetRoot, "order_lines.parquet");
 {
     options.UseDuckDB("Data Source=:memory:");
 });
