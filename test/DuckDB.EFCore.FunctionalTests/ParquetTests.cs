@@ -35,6 +35,19 @@ public class ParquetTests
     }
 
     [Fact]
+    public void Relationship_join_between_two_parquet_sets_uses_read_parquet_for_both()
+    {
+        using var context = CreateContext();
+        var sql = context.MyData
+            .Join(context.RelatedParquetData, m => m.Id, r => r.MyDataId, (m, r) => new { m.Id, r.Value })
+            .ToQueryString();
+
+        Assert.Contains("read_parquet('data/*.parquet')", sql);
+        Assert.Contains("read_parquet('related/*.parquet')", sql);
+        Assert.Contains("JOIN", sql);
+    }
+
+    [Fact]
     public void Write_throws_for_parquet_entity()
     {
         using var context = CreateContext();
@@ -56,16 +69,35 @@ public class ParquetTests
     {
         public DbSet<MyData> MyData => Set<MyData>();
         public DbSet<OtherData> Others => Set<OtherData>();
+        public DbSet<RelatedParquetData> RelatedParquetData => Set<RelatedParquetData>();
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            modelBuilder.Entity<MyData>()
+                .HasMany(x => x.Related)
+                .WithOne(x => x.MyData)
+                .HasForeignKey(x => x.MyDataId);
+        }
     }
 
     [Parquet("data/*.parquet")]
     private sealed class MyData
     {
         public int Id { get; set; }
+        public List<RelatedParquetData> Related { get; set; } = [];
     }
 
     private sealed class OtherData
     {
         public int Id { get; set; }
+    }
+
+    [Parquet("related/*.parquet")]
+    private sealed class RelatedParquetData
+    {
+        public int Id { get; set; }
+        public int MyDataId { get; set; }
+        public int Value { get; set; }
+        public MyData? MyData { get; set; }
     }
 }
