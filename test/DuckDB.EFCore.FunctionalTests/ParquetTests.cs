@@ -39,7 +39,7 @@ public class ParquetTests
     {
         using var context = CreateContext();
         var sql = context.MyData
-            .Join(context.RelatedParquetData, m => m.Id, r => r.MyDataId, (m, r) => new { m.Id, r.Value })
+            .SelectMany(m => m.Related, (m, r) => new { m.Id, r.Value })
             .ToQueryString();
 
         Assert.Contains("read_parquet('data/*.parquet')", sql);
@@ -70,14 +70,6 @@ public class ParquetTests
         public DbSet<MyData> MyData => Set<MyData>();
         public DbSet<OtherData> Others => Set<OtherData>();
         public DbSet<RelatedParquetData> RelatedParquetData => Set<RelatedParquetData>();
-
-        protected override void OnModelCreating(ModelBuilder modelBuilder)
-        {
-            modelBuilder.Entity<MyData>()
-                .HasMany(x => x.Related)
-                .WithOne(x => x.MyData)
-                .HasForeignKey(x => x.MyDataId);
-        }
     }
 
     [Parquet("data/*.parquet")]
