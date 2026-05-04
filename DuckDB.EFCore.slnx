@@ -6,6 +6,7 @@
     <File Path="README.md" />
   </Folder>
   <Folder Name="/src/">
+    <Project Path="demo/ParquetGraphQlDemo/ParquetGraphQlDemo.csproj" />
     <Project Path="src/DuckDB.EFCore.NTS/DuckDB.EFCore.NTS.csproj" />
     <Project Path="src/DuckDB.EFCore/DuckDB.EFCore.csproj" />
   </Folder>

@@ -6,7 +6,7 @@ public sealed record Customer
     public int Id { get; init; }
     public string Name { get; init; } = string.Empty;
     public string Email { get; init; } = string.Empty;
-    public ICollection<Order> Orders { get; init; } = [];
+    public ICollection<Order> Orders { get; set; } = new List<Order>();
 }
 
 [Parquet("data/orders.parquet")]
@@ -17,7 +17,7 @@ public sealed record Order
     public Customer? Customer { get; init; }
     public DateOnly OrderedOn { get; init; }
     public decimal TotalAmount { get; init; }
-    public ICollection<OrderLine> Lines { get; init; } = [];
+    public ICollection<OrderLine> Lines { get; set; } = new List<OrderLine>();
 }
 
 [Parquet("data/order_lines.parquet")]
