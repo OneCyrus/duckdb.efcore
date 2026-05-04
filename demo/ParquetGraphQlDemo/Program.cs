@@ -9,7 +9,7 @@ Directory.CreateDirectory(parquetRoot);
 
 await DemoDataSeeder.SeedAsync(parquetRoot);
 
-builder.Services.AddDbContextFactory<DemoDbContext>((_, options) =>
+builder.Services.AddDbContext<DemoDbContext>((_, options) =>
 {
     options.UseDuckDB("Data Source=:memory:");
 });
@@ -19,6 +19,7 @@ builder.Services.AddScoped<DemoQueryService>();
 builder.Services
     .AddGraphQLServer()
     .AddQueryType<Query>()
+    .AddProjections()
     .AddFiltering()
     .AddSorting();
 
@@ -33,18 +34,21 @@ public sealed class Query
 {
     [UseFiltering]
     [UseSorting]
-    public Task<IReadOnlyList<Customer>> Customers([Service] DemoQueryService service)
-        => service.GetCustomersAsync();
+    [UseProjection]
+    public IQueryable<Customer> Customers([Service] DemoQueryService service)
+        => service.GetCustomers();
 
     [UseFiltering]
     [UseSorting]
-    public Task<IReadOnlyList<Order>> Orders([Service] DemoQueryService service)
-        => service.GetOrdersAsync();
+    [UseProjection]
+    public IQueryable<Order> Orders([Service] DemoQueryService service)
+        => service.GetOrders();
 
     [UseFiltering]
     [UseSorting]
-    public Task<IReadOnlyList<OrderLine>> OrderLines([Service] DemoQueryService service)
-        => service.GetOrderLinesAsync();
+    [UseProjection]
+    public IQueryable<OrderLine> OrderLines([Service] DemoQueryService service)
+        => service.GetOrderLines();
 }
 
 public static class DemoDataSeeder
