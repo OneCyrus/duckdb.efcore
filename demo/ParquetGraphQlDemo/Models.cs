@@ -1,7 +1,7 @@
 using DuckDB.EFCore.Metadata;
 
 [Parquet("data/customers.parquet")]
-public sealed record Customer
+public sealed class Customer
 {
     public int Id { get; init; }
     public string Name { get; init; } = string.Empty;
@@ -10,7 +10,7 @@ public sealed record Customer
 }
 
 [Parquet("data/orders.parquet")]
-public sealed record Order
+public sealed class Order
 {
     public int Id { get; init; }
     public int CustomerId { get; init; }
@@ -21,7 +21,7 @@ public sealed record Order
 }
 
 [Parquet("data/order_lines.parquet")]
-public sealed record OrderLine
+public sealed class OrderLine
 {
     public int Id { get; init; }
     public int OrderId { get; init; }
