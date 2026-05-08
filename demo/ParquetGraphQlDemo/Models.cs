@@ -1,6 +1,5 @@
 using DuckDB.EFCore.Metadata;
 
-[Parquet("data/customers.parquet")]
 public class Customer
 {
     public int Id { get; set; }
@@ -20,7 +19,6 @@ public class Order
     public virtual ICollection<OrderLine> Lines { get; set; } = new List<OrderLine>();
 }
 
-[Parquet("data/order_lines.parquet")]
 public class OrderLine
 {
     public int Id { get; set; }
