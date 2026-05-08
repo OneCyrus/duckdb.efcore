@@ -8,11 +8,15 @@ public static class DemoDataSeeder
         var ordersFile = System.IO.Path.Combine(parquetRoot, "orders.parquet");
         var orderLinesFile = System.IO.Path.Combine(parquetRoot, "order_lines.parquet");
 
-        if (File.Exists(customersFile) && File.Exists(ordersFile) && File.Exists(orderLinesFile))
-        {
-            return;
-        }
+        // Delete existing files to ensure fresh data with correct schema
+        if (File.Exists(customersFile))
+            File.Delete(customersFile);
+        if (File.Exists(ordersFile))
+            File.Delete(ordersFile);
+        if (File.Exists(orderLinesFile))
+            File.Delete(orderLinesFile);
 
+        // Create Parquet files with data
         await using var connection = new DuckDBConnection("Data Source=:memory:");
         await connection.OpenAsync();
 

@@ -1,32 +1,32 @@
 using DuckDB.EFCore.Metadata;
 
 [Parquet("data/customers.parquet")]
-public sealed class Customer
+public class Customer
 {
-    public int Id { get; init; }
-    public string Name { get; init; } = string.Empty;
-    public string Email { get; init; } = string.Empty;
-    public ICollection<Order> Orders { get; set; } = new List<Order>();
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string Email { get; set; } = string.Empty;
+    public virtual ICollection<Order> Orders { get; set; } = new List<Order>();
 }
 
 [Parquet("data/orders.parquet")]
-public sealed class Order
+public class Order
 {
-    public int Id { get; init; }
-    public int CustomerId { get; init; }
-    public Customer? Customer { get; init; }
-    public DateOnly OrderedOn { get; init; }
-    public decimal TotalAmount { get; init; }
-    public ICollection<OrderLine> Lines { get; set; } = new List<OrderLine>();
+    public int Id { get; set; }
+    public int CustomerId { get; set; }
+    public virtual Customer? Customer { get; set; }
+    public DateOnly OrderedOn { get; set; }
+    public decimal TotalAmount { get; set; }
+    public virtual ICollection<OrderLine> Lines { get; set; } = new List<OrderLine>();
 }
 
 [Parquet("data/order_lines.parquet")]
-public sealed class OrderLine
+public class OrderLine
 {
-    public int Id { get; init; }
-    public int OrderId { get; init; }
-    public Order? Order { get; init; }
-    public string ProductName { get; init; } = string.Empty;
-    public int Quantity { get; init; }
-    public decimal LineTotal { get; init; }
+    public int Id { get; set; }
+    public int OrderId { get; set; }
+    public virtual Order? Order { get; set; }
+    public string ProductName { get; set; } = string.Empty;
+    public int Quantity { get; set; }
+    public decimal LineTotal { get; set; }
 }

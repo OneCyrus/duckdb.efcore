@@ -1,15 +1,19 @@
 using DuckDB.EFCore.Extensions;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
 var parquetRoot = System.IO.Path.Combine(builder.Environment.ContentRootPath, "data");
 Directory.CreateDirectory(parquetRoot);
 
+// Ensure parquet files exist
 await DemoDataSeeder.SeedAsync(parquetRoot);
 
 builder.Services.AddPooledDbContextFactory<DemoDbContext>((_, options) =>
 {
-    options.UseDuckDB("Data Source=:memory:");
+    options
+        .UseDuckDB("Data Source=:memory:")
+        .UseLazyLoadingProxies();
 });
 
 builder.Services

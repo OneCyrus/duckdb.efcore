@@ -49,6 +49,32 @@ public class ParquetTests
     }
 
     [Fact]
+    public void Reference_navigation_projection_from_parquet_entity_uses_join()
+    {
+        using var context = CreateContext();
+        var sql = context.RelatedParquetData
+            .Select(r => new { r.Id, ParentId = r.MyData!.Id })
+            .ToQueryString();
+
+        Assert.Contains("read_parquet('related/*.parquet')", sql);
+        Assert.Contains("read_parquet('data/*.parquet')", sql);
+        Assert.Contains("JOIN", sql);
+    }
+
+    [Fact]
+    public void Collection_navigation_projection_from_parquet_entity_uses_join()
+    {
+        using var context = CreateContext();
+        var sql = context.MyData
+            .SelectMany(m => m.Related.Select(r => new { m.Id, RelatedId = r.Id }))
+            .ToQueryString();
+
+        Assert.Contains("read_parquet('data/*.parquet')", sql);
+        Assert.Contains("read_parquet('related/*.parquet')", sql);
+        Assert.Contains("JOIN", sql);
+    }
+
+    [Fact]
     public void Write_throws_for_parquet_entity()
     {
         using var context = CreateContext();
@@ -71,6 +97,14 @@ public class ParquetTests
         public DbSet<MyData> MyData => Set<MyData>();
         public DbSet<OtherData> Others => Set<OtherData>();
         public DbSet<RelatedParquetData> RelatedParquetData => Set<RelatedParquetData>();
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            modelBuilder.Entity<MyData>()
+                .HasMany(x => x.Related)
+                .WithOne(x => x.MyData)
+                .HasForeignKey(x => x.MyDataId);
+        }
     }
 
     [Parquet("data/*.parquet")]
