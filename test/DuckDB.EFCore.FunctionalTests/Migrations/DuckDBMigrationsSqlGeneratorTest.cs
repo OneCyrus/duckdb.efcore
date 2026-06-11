@@ -1,8 +1,7 @@
-﻿using DuckDB.EFCore.FunctionalTests;
-using DuckDB.EFCore.FunctionalTests.TestUtilities;
-using DuckDB.EFCore.Infrastructure;
+﻿using DuckDB.EFCore.Infrastructure;
 using DuckDB.EFCore.NTS.Extensions;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.TestUtilities;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -22,7 +21,7 @@ public class DuckDBMigrationsSqlGeneratorTest : MigrationsSqlGeneratorTestBase
 
     protected override string GetGeometryCollectionStoreType()
     {
-        throw new NotImplementedException();
+        return "GEOMETRYCOLLECTION";
     }
 
     public override void AddColumnOperation_without_column_type()
@@ -85,7 +84,6 @@ public class DuckDBMigrationsSqlGeneratorTest : MigrationsSqlGeneratorTestBase
         base.AlterColumnOperation_without_column_type();
     }
 
-    [ConditionalFact(Skip = DuckDBSkipReasons.Tbd)]
     public override void InsertDataOperation_all_args_spatial()
     {
         base.InsertDataOperation_all_args_spatial();

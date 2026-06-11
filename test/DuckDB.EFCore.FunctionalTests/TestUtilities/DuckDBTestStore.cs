@@ -1,20 +1,18 @@
 ﻿using DuckDB.EFCore.Extensions;
 using DuckDB.EFCore.Infrastructure;
 using DuckDB.NET.Data;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.TestUtilities;
 using Microsoft.Extensions.DependencyInjection;
 using System.Data;
 using System.Data.Common;
 
-namespace DuckDB.EFCore.FunctionalTests.TestUtilities;
+namespace Microsoft.EntityFrameworkCore.TestUtilities;
 
 public class DuckDBTestStore : RelationalTestStore
 {
     public const int CommandTimeout = 30;
 
-    public static DuckDBTestStore GetOrCreate(string name, bool sharedCache = false)
-        => new(name, sharedCache: sharedCache);
+    public static DuckDBTestStore GetOrCreate(string name)
+        => new(name);
 
     public static async Task<DuckDBTestStore> GetOrCreateInitializedAsync(string name)
         => await new DuckDBTestStore(name).InitializeDuckDBAsync(
@@ -29,10 +27,17 @@ public class DuckDBTestStore : RelationalTestStore
         => new(name, shared: false);
 
     private readonly bool _seed;
+    private bool _loadSpatial;
 
-    private DuckDBTestStore(string name, bool seed = true, bool sharedCache = false, bool shared = true)
-        : base(name, shared, CreateConnection(name, sharedCache))
+    private DuckDBTestStore(string name, bool seed = true, bool shared = true)
+        : base(name, shared, CreateConnection(name))
         => _seed = seed;
+
+    public DuckDBTestStore WithSpatialExtension()
+    {
+        _loadSpatial = true;
+        return this;
+    }
 
     public virtual DbContextOptionsBuilder AddProviderOptions(
         DbContextOptionsBuilder builder,
@@ -103,13 +108,11 @@ public class DuckDBTestStore : RelationalTestStore
         return command;
     }
 
-    private static DuckDBConnection CreateConnection(string name, bool sharedCache)
+    private static DuckDBConnection CreateConnection(string name)
     {
         var connectionString = new DuckDBConnectionStringBuilder
         {
-            DataSource = sharedCache
-                ? DuckDBConnectionStringBuilder.InMemorySharedDataSource
-                : name + ".db"
+            DataSource = name + ".db",
         }.ToString();
 
         return new DuckDBConnection(connectionString);
@@ -122,6 +125,7 @@ public class DuckDBTestStore : RelationalTestStore
         if (connection.State != ConnectionState.Open)
         {
             connection.Open();
+            LoadSpatialExtensionIfNeeded();
         }
     }
 
@@ -132,7 +136,19 @@ public class DuckDBTestStore : RelationalTestStore
         if (connection.State != ConnectionState.Open)
         {
             await connection.OpenAsync();
+            LoadSpatialExtensionIfNeeded();
         }
+    }
+
+    private void LoadSpatialExtensionIfNeeded()
+    {
+        if (!_loadSpatial)
+        {
+            return;
+        }
+
+        ExecuteNonQuery("INSTALL spatial");
+        ExecuteNonQuery("LOAD spatial");
     }
 
     protected override string OpenDelimiter => "\"";

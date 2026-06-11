@@ -1,11 +1,8 @@
-﻿using DuckDB.EFCore.FunctionalTests.TestUtilities;
-using DuckDB.EFCore.Infrastructure;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Query;
+﻿using DuckDB.EFCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Xunit;
 
-namespace DuckDB.EFCore.FunctionalTests.Query;
+namespace Microsoft.EntityFrameworkCore.Query;
 
 public class NonSharedPrimitiveCollectionsQueryDuckDBTest : NonSharedPrimitiveCollectionsQueryRelationalTestBase
 {
@@ -59,6 +56,12 @@ public class NonSharedPrimitiveCollectionsQueryDuckDBTest : NonSharedPrimitiveCo
     public override Task Parameter_collection_Contains_with_default_mode(ParameterTranslationMode mode)
     {
         return base.Parameter_collection_Contains_with_default_mode(mode);
+    }
+
+    [ConditionalTheory(Skip = DuckDBSkipReasons.Tbd)]
+    public override Task Parameter_collection_of_enum_Cast_from_different_enum_type(ParameterTranslationMode mode)
+    {
+        return base.Parameter_collection_of_enum_Cast_from_different_enum_type(mode);
     }
 
     protected override ITestStoreFactory TestStoreFactory

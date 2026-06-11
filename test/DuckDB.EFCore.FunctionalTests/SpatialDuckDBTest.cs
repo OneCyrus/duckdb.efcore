@@ -1,12 +1,9 @@
-﻿using DuckDB.EFCore.FunctionalTests.TestUtilities;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
+﻿using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 
-namespace DuckDB.EFCore.FunctionalTests;
+namespace Microsoft.EntityFrameworkCore;
 
-[SpatialiteRequired]
 public class SpatialDuckDBTest : SpatialTestBase<SpatialDuckDBFixture>
 {
     public SpatialDuckDBTest(SpatialDuckDBFixture fixture) : base(fixture)

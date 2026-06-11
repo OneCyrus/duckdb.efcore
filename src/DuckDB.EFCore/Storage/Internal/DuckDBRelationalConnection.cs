@@ -1,4 +1,5 @@
 ﻿using DuckDB.EFCore.Extensions;
+using DuckDB.EFCore.Infrastructure.Internal;
 using DuckDB.NET.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -18,6 +19,7 @@ public class DuckDBRelationalConnection : RelationalConnection, IDuckDBRelationa
 {
     private readonly IRawSqlCommandBuilder _rawSqlCommandBuilder;
     private readonly IDiagnosticsLogger<DbLoggerCategory.Infrastructure> _logger;
+    private readonly bool _loadSpatial;
 
     /// <summary>
     ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
@@ -33,7 +35,15 @@ public class DuckDBRelationalConnection : RelationalConnection, IDuckDBRelationa
     {
         _rawSqlCommandBuilder = rawSqlCommandBuilder;
         _logger = logger;
+
+        var optionsExtension = dependencies.ContextOptions.FindExtension<DuckDBOptionsExtension>();
+        _loadSpatial = optionsExtension?.LoadSpatialite == true;
     }
+
+    // DuckDB.NET only supports IsolationLevel.Unspecified and IsolationLevel.Snapshot.
+    // We expose IsolationLevel.Snapshot to callers so that EF Core's interception infrastructure
+    // always sees a concrete isolation level instead of Unspecified.
+    private const IsolationLevel DuckDBDefaultIsolationLevel = IsolationLevel.Snapshot;
 
     /// <inheritdoc />
     protected override DbConnection CreateDbConnection()
@@ -41,6 +51,67 @@ public class DuckDBRelationalConnection : RelationalConnection, IDuckDBRelationa
         var connection = new DuckDBConnection(GetValidatedConnectionString());
 
         return connection;
+    }
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     Overrides the no-arg overload so that EF Core's interception pipeline sees
+    ///     <see cref="IsolationLevel.Snapshot" /> (DuckDB's actual isolation level) instead of
+    ///     <see cref="IsolationLevel.Unspecified" /> in the event data.
+    /// </remarks>
+    public override IDbContextTransaction BeginTransaction()
+        => BeginTransaction(DuckDBDefaultIsolationLevel);
+
+    /// <inheritdoc />
+    public override Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default)
+        => BeginTransactionAsync(DuckDBDefaultIsolationLevel, cancellationToken);
+
+    /// <inheritdoc />
+    protected override DbTransaction ConnectionBeginTransaction(IsolationLevel isolationLevel)
+    {
+        // DuckDB.NET only accepts Unspecified and Snapshot; map unsupported levels to Unspecified.
+        var driverLevel = ToDuckDBIsolationLevel(isolationLevel);
+        var transaction = base.ConnectionBeginTransaction(driverLevel);
+
+        return new DuckDBDbTransactionWrapper(transaction, isolationLevel);
+    }
+
+    /// <inheritdoc />
+    protected override async ValueTask<DbTransaction> ConnectionBeginTransactionAsync(
+        IsolationLevel isolationLevel,
+        CancellationToken cancellationToken = default)
+    {
+        // DuckDB.NET only accepts Unspecified and Snapshot; map unsupported levels to Unspecified.
+        var driverLevel = ToDuckDBIsolationLevel(isolationLevel);
+        var transaction = await base.ConnectionBeginTransactionAsync(driverLevel, cancellationToken);
+
+        return new DuckDBDbTransactionWrapper(transaction, isolationLevel);
+    }
+
+    /// <summary>
+    ///     Maps any <see cref="IsolationLevel" /> to one that DuckDB.NET accepts
+    ///     (<see cref="IsolationLevel.Unspecified" /> or <see cref="IsolationLevel.Snapshot" />).
+    ///     Unsupported levels fall back to <see cref="IsolationLevel.Unspecified" />.
+    /// </summary>
+    private static IsolationLevel ToDuckDBIsolationLevel(IsolationLevel isolationLevel)
+        => isolationLevel is IsolationLevel.Unspecified or IsolationLevel.Snapshot
+            ? isolationLevel
+            : IsolationLevel.Unspecified;
+
+    /// <summary>
+    ///     Wraps a <see cref="DbTransaction" /> to expose a concrete <see cref="IsolationLevel" /> because
+    ///     DuckDB.NET reports <see cref="IsolationLevel.Unspecified" /> for all transactions.
+    /// </summary>
+    private sealed class DuckDBDbTransactionWrapper(DbTransaction inner, IsolationLevel isolationLevel) : DbTransaction
+    {
+        public override IsolationLevel IsolationLevel { get; } = isolationLevel;
+        protected override DbConnection DbConnection => inner.Connection!;
+        public override void Commit() => inner.Commit();
+        public override void Rollback() => inner.Rollback();
+        public override Task CommitAsync(CancellationToken cancellationToken = default) => inner.CommitAsync(cancellationToken);
+        public override Task RollbackAsync(CancellationToken cancellationToken = default) => inner.RollbackAsync(cancellationToken);
+        protected override void Dispose(bool disposing) { if (disposing) inner.Dispose(); }
+        public override ValueTask DisposeAsync() => inner.DisposeAsync();
     }
 
     /// <summary>
@@ -88,6 +159,7 @@ public class DuckDBRelationalConnection : RelationalConnection, IDuckDBRelationa
         if (connection.State != ConnectionState.Open)
         {
             connection.Open();
+            LoadSpatialExtensionIfNeeded();
         }
     }
 
@@ -98,6 +170,31 @@ public class DuckDBRelationalConnection : RelationalConnection, IDuckDBRelationa
         if (connection.State != ConnectionState.Open)
         {
             await connection.OpenAsync(cancellationToken);
+            await LoadSpatialExtensionIfNeededAsync(cancellationToken);
         }
+    }
+
+    private void LoadSpatialExtensionIfNeeded()
+    {
+        if (!_loadSpatial)
+        {
+            return;
+        }
+
+        var paramObj = new RelationalCommandParameterObject(this, null, null, null, null);
+        _rawSqlCommandBuilder.Build("INSTALL spatial").ExecuteNonQuery(paramObj);
+        _rawSqlCommandBuilder.Build("LOAD spatial").ExecuteNonQuery(paramObj);
+    }
+
+    private async Task LoadSpatialExtensionIfNeededAsync(CancellationToken cancellationToken)
+    {
+        if (!_loadSpatial)
+        {
+            return;
+        }
+
+        var paramObj = new RelationalCommandParameterObject(this, null, null, null, null);
+        await _rawSqlCommandBuilder.Build("INSTALL spatial").ExecuteNonQueryAsync(paramObj, cancellationToken);
+        await _rawSqlCommandBuilder.Build("LOAD spatial").ExecuteNonQueryAsync(paramObj, cancellationToken);
     }
 }

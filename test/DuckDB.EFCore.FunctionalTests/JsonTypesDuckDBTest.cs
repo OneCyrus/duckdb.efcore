@@ -1,9 +1,7 @@
-﻿using DuckDB.EFCore.FunctionalTests.TestUtilities;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.TestUtilities;
+﻿using Microsoft.EntityFrameworkCore.TestUtilities;
 using Xunit;
 
-namespace DuckDB.EFCore.FunctionalTests;
+namespace Microsoft.EntityFrameworkCore;
 
 public class JsonTypesDuckDBTest : JsonTypesRelationalTestBase
 {
@@ -71,11 +69,18 @@ public class JsonTypesDuckDBTest : JsonTypesRelationalTestBase
         await base.Can_read_write_collection_of_nullable_ulong_enum_JSON_values();
     }
 
-    [ConditionalFact(Skip = DuckDBSkipReasons.Tbd)]
-    public override async Task Can_read_write_collection_of_ulong_enum_JSON_values()
-    {
-        await base.Can_read_write_collection_of_ulong_enum_JSON_values();
-    }
+    public override Task Can_read_write_collection_of_ulong_enum_JSON_values()
+        => Can_read_and_write_JSON_value<EnumU64CollectionType, List<EnumU64>>(
+            nameof(EnumU64CollectionType.EnumU64),
+            [
+                EnumU64.Min,
+                EnumU64.Max,
+                EnumU64.Default,
+                EnumU64.One,
+                (EnumU64)8
+            ],
+            """{"Prop":[0,18446744073709551615,0,1,8]}""", // DuckDB supports UBIGINT natively, unlike SQL Server
+            mappedCollection: true);
 
     [ConditionalTheory(Skip = DuckDBSkipReasons.Tbd)]
     public override async Task Can_read_write_list_of_array_of_binary_JSON_values(string expected)
@@ -174,39 +179,9 @@ public class JsonTypesDuckDBTest : JsonTypesRelationalTestBase
     }
 
     [ConditionalTheory(Skip = DuckDBSkipReasons.Tbd)]
-    public override async Task Can_read_write_binary_JSON_values(string value, string json)
-    {
-        await base.Can_read_write_binary_JSON_values(value, json);
-    }
-
-    [ConditionalTheory(Skip = DuckDBSkipReasons.Tbd)]
-    public override async Task Can_read_write_char_JSON_values(char value, string json)
-    {
-        await base.Can_read_write_char_JSON_values(value, json);
-    }
-
-    [ConditionalTheory(Skip = DuckDBSkipReasons.Tbd)]
     public override async Task Can_read_write_collection_of_binary_JSON_values(string expected)
     {
         await base.Can_read_write_collection_of_binary_JSON_values(expected);
-    }
-
-    [ConditionalFact(Skip = DuckDBSkipReasons.Tbd)]
-    public override async Task Can_read_write_collection_of_char_JSON_values()
-    {
-        await base.Can_read_write_collection_of_char_JSON_values();
-    }
-
-    [ConditionalFact(Skip = DuckDBSkipReasons.Tbd)]
-    public override async Task Can_read_write_collection_of_DateOnly_JSON_values()
-    {
-        await base.Can_read_write_collection_of_DateOnly_JSON_values();
-    }
-
-    [ConditionalFact(Skip = DuckDBSkipReasons.Tbd)]
-    public override async Task Can_read_write_collection_of_char_values_with_converter_as_JSON_string()
-    {
-        await base.Can_read_write_collection_of_char_values_with_converter_as_JSON_string();
     }
 
     [ConditionalTheory(Skip = DuckDBSkipReasons.Tbd)]
@@ -219,186 +194,6 @@ public class JsonTypesDuckDBTest : JsonTypesRelationalTestBase
     public override async Task Can_read_write_collection_of_nullable_binary_JSON_values(string expected)
     {
         await base.Can_read_write_collection_of_nullable_binary_JSON_values(expected);
-    }
-
-    [ConditionalFact(Skip = DuckDBSkipReasons.Tbd)]
-    public override async Task Can_read_write_collection_of_nullable_char_JSON_values()
-    {
-        await base.Can_read_write_collection_of_nullable_char_JSON_values();
-    }
-
-    [ConditionalFact(Skip = DuckDBSkipReasons.Tbd)]
-    public override async Task Can_read_write_collection_of_nullable_char_values_with_converter_as_JSON_string()
-    {
-        await base.Can_read_write_collection_of_nullable_char_values_with_converter_as_JSON_string();
-    }
-
-    [ConditionalFact(Skip = DuckDBSkipReasons.Tbd)]
-    public override async Task Can_read_write_line_string()
-    {
-        await base.Can_read_write_line_string();
-    }
-
-    [ConditionalFact(Skip = DuckDBSkipReasons.Tbd)]
-    public override async Task Can_read_write_line_string_as_GeoJson()
-    {
-        await base.Can_read_write_line_string_as_GeoJson();
-    }
-
-    [ConditionalFact(Skip = DuckDBSkipReasons.Tbd)]
-    public override async Task Can_read_write_multi_line_string()
-    {
-        await base.Can_read_write_multi_line_string();
-    }
-
-    [ConditionalFact(Skip = DuckDBSkipReasons.Tbd)]
-    public override async Task Can_read_write_multi_line_string_as_GeoJson()
-    {
-        await base.Can_read_write_multi_line_string_as_GeoJson();
-    }
-
-    [ConditionalTheory(Skip = DuckDBSkipReasons.Tbd)]
-    public override async Task Can_read_write_nullable_binary_JSON_values(string? value, string json)
-    {
-        await base.Can_read_write_nullable_binary_JSON_values(value, json);
-    }
-
-    [ConditionalTheory(Skip = DuckDBSkipReasons.Tbd)]
-    public override async Task Can_read_write_nullable_char_JSON_values(char? value, string json)
-    {
-        await base.Can_read_write_nullable_char_JSON_values(value, json);
-    }
-
-    [ConditionalFact(Skip = DuckDBSkipReasons.Tbd)]
-    public override async Task Can_read_write_nullable_line_string()
-    {
-        await base.Can_read_write_nullable_line_string();
-    }
-
-    [ConditionalFact(Skip = DuckDBSkipReasons.Tbd)]
-    public override async Task Can_read_write_nullable_line_string_as_GeoJson()
-    {
-        await base.Can_read_write_nullable_line_string_as_GeoJson();
-    }
-
-    [ConditionalFact(Skip = DuckDBSkipReasons.Tbd)]
-    public override async Task Can_read_write_nullable_multi_line_string()
-    {
-        await base.Can_read_write_nullable_multi_line_string();
-    }
-
-    [ConditionalFact(Skip = DuckDBSkipReasons.Tbd)]
-    public override Task Can_read_write_nullable_multi_line_string_as_GeoJson()
-    {
-        return base.Can_read_write_nullable_multi_line_string_as_GeoJson();
-    }
-
-    [ConditionalFact(Skip = DuckDBSkipReasons.Tbd)]
-    public override async Task Can_read_write_nullable_point()
-    {
-        await base.Can_read_write_nullable_point();
-    }
-
-    [ConditionalFact(Skip = DuckDBSkipReasons.Tbd)]
-    public override Task Can_read_write_nullable_point_as_GeoJson()
-    {
-        return base.Can_read_write_nullable_point_as_GeoJson();
-    }
-
-    [ConditionalFact(Skip = DuckDBSkipReasons.Tbd)]
-    public override Task Can_read_write_nullable_polygon()
-    {
-        return base.Can_read_write_nullable_polygon();
-    }
-
-    [ConditionalFact(Skip = DuckDBSkipReasons.Tbd)]
-    public override async Task Can_read_write_nullable_polygon_as_GeoJson()
-    {
-        await base.Can_read_write_nullable_polygon_as_GeoJson();
-    }
-
-    [ConditionalFact(Skip = DuckDBSkipReasons.Tbd)]
-    public override async Task Can_read_write_point()
-    {
-        await base.Can_read_write_point();
-    }
-
-    [ConditionalFact(Skip = DuckDBSkipReasons.Tbd)]
-    public override async Task Can_read_write_point_as_GeoJson()
-    {
-        await base.Can_read_write_point_as_GeoJson();
-    }
-
-    [ConditionalFact(Skip = DuckDBSkipReasons.Tbd)]
-    public override async Task Can_read_write_point_with_M()
-    {
-        await base.Can_read_write_point_with_M();
-    }
-
-    [ConditionalFact(Skip = DuckDBSkipReasons.Tbd)]
-    public override async Task Can_read_write_point_with_M_as_GeoJson()
-    {
-        await base.Can_read_write_point_with_M_as_GeoJson();
-    }
-
-    [ConditionalFact(Skip = DuckDBSkipReasons.Tbd)]
-    public override async Task Can_read_write_point_with_Z()
-    {
-        await base.Can_read_write_point_with_Z();
-    }
-
-    [ConditionalFact(Skip = DuckDBSkipReasons.Tbd)]
-    public override async Task Can_read_write_point_with_Z_and_M()
-    {
-        await base.Can_read_write_point_with_Z_and_M();
-    }
-
-    [ConditionalFact(Skip = DuckDBSkipReasons.Tbd)]
-    public override async Task Can_read_write_point_with_Z_and_M_as_GeoJson()
-    {
-        await base.Can_read_write_point_with_Z_and_M_as_GeoJson();
-    }
-
-    [ConditionalFact(Skip = DuckDBSkipReasons.Tbd)]
-    public override async Task Can_read_write_point_with_Z_as_GeoJson()
-    {
-        await base.Can_read_write_point_with_Z_as_GeoJson();
-    }
-
-    [ConditionalFact(Skip = DuckDBSkipReasons.Tbd)]
-    public override async Task Can_read_write_polygon()
-    {
-        await base.Can_read_write_polygon();
-    }
-
-    [ConditionalFact(Skip = DuckDBSkipReasons.Tbd)]
-    public override async Task Can_read_write_polygon_as_GeoJson()
-    {
-        await base.Can_read_write_polygon_as_GeoJson();
-    }
-
-    [ConditionalFact(Skip = DuckDBSkipReasons.Tbd)]
-    public override async Task Can_read_write_polygon_typed_as_geometry()
-    {
-        await base.Can_read_write_polygon_typed_as_geometry();
-    }
-
-    [ConditionalFact(Skip = DuckDBSkipReasons.Tbd)]
-    public override async Task Can_read_write_polygon_typed_as_nullable_geometry()
-    {
-        await base.Can_read_write_polygon_typed_as_nullable_geometry();
-    }
-
-    [ConditionalFact(Skip = DuckDBSkipReasons.Tbd)]
-    public override async Task Can_read_write_polygon_typed_as_geometry_as_GeoJson()
-    {
-        await base.Can_read_write_polygon_typed_as_geometry_as_GeoJson();
-    }
-
-    [ConditionalFact(Skip = DuckDBSkipReasons.Tbd)]
-    public override async Task Can_read_write_polygon_typed_as_nullable_geometry_as_GeoJson()
-    {
-        await base.Can_read_write_polygon_typed_as_nullable_geometry_as_GeoJson();
     }
 
     protected override ITestStoreFactory TestStoreFactory

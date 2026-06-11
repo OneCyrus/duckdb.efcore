@@ -33,7 +33,7 @@ public class DuckDBQuerySqlGeneratorFactory : IQuerySqlGeneratorFactory
     }
 
     /// <inheritdoc />
-    public QuerySqlGenerator Create()
+    public virtual QuerySqlGenerator Create()
     {
         return new DuckDBQuerySqlGenerator(
             _dependencies,

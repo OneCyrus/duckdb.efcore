@@ -1,10 +1,8 @@
 ﻿using DuckDB.EFCore.Extensions;
-using DuckDB.EFCore.FunctionalTests.TestUtilities;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Xunit;
 
-namespace DuckDB.EFCore.FunctionalTests;
+namespace Microsoft.EntityFrameworkCore;
 
 public class TwoDatabasesDuckDBTest : TwoDatabasesTestBase, IClassFixture<TwoDatabasesDuckDBTest.TwoDatabasesFixture>
 {
@@ -16,12 +14,6 @@ public class TwoDatabasesDuckDBTest : TwoDatabasesTestBase, IClassFixture<TwoDat
     public override void Can_query_from_one_connection_string_and_save_changes_to_another()
     {
         base.Can_query_from_one_connection_string_and_save_changes_to_another();
-    }
-
-    [ConditionalTheory(Skip = DuckDBSkipReasons.Tbd)]
-    public override void Can_set_connection_string_in_interceptor(bool withConnectionString, bool withNullConnectionString)
-    {
-        base.Can_set_connection_string_in_interceptor(withConnectionString, withNullConnectionString);
     }
 
     protected new TwoDatabasesFixture Fixture

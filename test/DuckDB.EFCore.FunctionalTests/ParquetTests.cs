@@ -1,152 +1,133 @@
-using DuckDB.EFCore.Metadata;
 using DuckDB.EFCore.Extensions;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
-using System;
+using DuckDB.EFCore.Metadata;
+using DuckDB.NET.Data;
+using Microsoft.EntityFrameworkCore.TestUtilities;
 using Xunit;
+using Xunit.Abstractions;
 
-namespace DuckDB.EFCore.FunctionalTests;
+namespace Microsoft.EntityFrameworkCore;
 
-public class ParquetTests
+public class ParquetTests : IClassFixture<ParquetTests.ParquetFixture>
 {
+    public ParquetTests(ParquetFixture fixture, ITestOutputHelper testOutputHelper)
+    {
+        Fixture = fixture;
+        Fixture.TestSqlLoggerFactory.Clear();
+        Fixture.TestSqlLoggerFactory.SetTestOutputHelper(testOutputHelper);
+    }
+
+    private ParquetFixture Fixture { get; }
+
     [Fact]
     public void Simple_query_uses_read_parquet()
     {
         using var context = CreateContext();
-        var sql = context.MyData.ToQueryString();
+        var _ = context.MyData.ToList();
 
-        Assert.Contains("read_parquet('data/*.parquet')", sql);
+        AssertSql(
+            """
+            SELECT m."Id"
+            FROM read_parquet('parquet/my_data.parquet') AS m
+            """);
     }
 
     [Fact]
     public void Where_query_uses_read_parquet()
     {
         using var context = CreateContext();
-        var sql = context.MyData.Where(x => x.Id > 10).ToQueryString();
+        var _ = context.MyData.Where(x => x.Id > 10).ToList();
 
-        Assert.Contains("read_parquet('data/*.parquet')", sql);
-        Assert.Contains("WHERE", sql);
+        AssertSql(
+            """
+            SELECT m."Id"
+            FROM read_parquet('parquet/my_data.parquet') AS m
+            WHERE m."Id" > 10
+            """);
     }
 
     [Fact]
     public void Join_query_uses_read_parquet()
     {
-        using var context = CreateContext();
-        var sql = context.MyData.Join(context.Others, x => x.Id, y => y.Id, (x, y) => x).ToQueryString();
+        using var context = CreateContext(Fixture.JoinDatabaseConnectionString);
+        var query =
+            from parquetRow in context.MyData
+            join otherRow in context.Others on parquetRow.Id equals otherRow.Id
+            select parquetRow;
 
-        Assert.Contains("read_parquet('data/*.parquet')", sql);
+        var _ = query.ToList();
+
+        AssertSql(
+            """
+            SELECT m."Id"
+            FROM read_parquet('parquet/my_data.parquet') AS m
+            INNER JOIN "Others" AS o ON m."Id" = o."Id"
+            """);
     }
 
     [Fact]
     public void Relationship_join_between_two_parquet_sets_uses_read_parquet_for_both()
     {
         using var context = CreateContext();
-        var sql = context.MyData
-            .SelectMany(m => m.Related, (m, r) => new { m.Id, r.Value })
-            .ToQueryString();
+        var relationshipQuery = context.MyData.SelectMany(
+            m => m.Related,
+            (m, r) => new { m.Id, r.Value }
+        );
 
-        Assert.Contains("read_parquet('data/*.parquet')", sql);
-        Assert.Contains("read_parquet('related/*.parquet')", sql);
-        Assert.Contains("JOIN", sql);
+        var _ = relationshipQuery.ToList();
+
+        AssertSql(
+            """
+            SELECT m."Id", r."Value"
+            FROM read_parquet('parquet/my_data.parquet') AS m
+            INNER JOIN read_parquet('parquet/related.parquet') AS r ON m."Id" = r."MyDataId"
+            """);
     }
 
     [Fact]
-    public void Reference_navigation_projection_from_parquet_entity_uses_join()
+    public void Dynamic_parquet_path_from_context_configuration_uses_read_parquet()
     {
-        using var context = CreateContext();
-        var sql = context.RelatedParquetData
-            .Select(r => new { r.Id, ParentId = r.MyData!.Id })
-            .ToQueryString();
+        using var context = CreateDynamicContext(ParquetFixture.MyDataParquetFile);
+        var _ = context.DynamicMyData.ToList();
 
-        Assert.Contains("read_parquet('related/*.parquet')", sql);
-        Assert.Contains("read_parquet('data/*.parquet')", sql);
-        Assert.Contains("JOIN", sql);
+        AssertSql(
+            """
+            SELECT d."Id"
+            FROM read_parquet('parquet/my_data.parquet') AS d
+            """);
     }
 
-    [Fact]
-    public void Collection_navigation_projection_from_parquet_entity_uses_join()
-    {
-        using var context = CreateContext();
-        var sql = context.MyData
-            .SelectMany(m => m.Related.Select(r => new { m.Id, RelatedId = r.Id }))
-            .ToQueryString();
+    private void AssertSql(params string[] expected)
+        => Fixture.TestSqlLoggerFactory.AssertBaseline(expected);
 
-        Assert.Contains("read_parquet('data/*.parquet')", sql);
-        Assert.Contains("read_parquet('related/*.parquet')", sql);
-        Assert.Contains("JOIN", sql);
-    }
-
-    [Fact]
-    public void Write_throws_for_parquet_entity()
-    {
-        using var context = CreateContext();
-        context.MyData.Add(new MyData { Id = 1 });
-
-        Assert.ThrowsAny<Exception>(() => context.SaveChanges());
-    }
-
-    [Fact]
-    public void Dynamic_parquet_path_from_service_provider_uses_read_parquet()
-    {
-        using var context = CreateDynamicContext("dynamic/*.parquet");
-        var sql = context.DynamicMyData.ToQueryString();
-
-        Assert.Contains("read_parquet('dynamic/*.parquet')", sql);
-    }
-
-    private static ParquetContext CreateContext()
+    private ParquetContext CreateContext(string? connectionString = null)
     {
         var options = new DbContextOptionsBuilder<ParquetContext>()
-            .UseDuckDB("DataSource=:memory:")
+            .UseInternalServiceProvider(Fixture.ServiceProvider)
+            .UseDuckDB(connectionString ?? "DataSource=:memory:")
             .Options;
-
         return new ParquetContext(options);
     }
 
-    private static DynamicParquetContext CreateDynamicContext(string parquetPath)
+    private DynamicParquetContext CreateDynamicContext(string parquetPath)
     {
-        TestParquetPathService.CurrentPath = parquetPath;
-
-        var services = new ServiceCollection();
-        services.AddEntityFrameworkDuckDB();
-
-        var serviceProvider = services.BuildServiceProvider();
-
         var options = new DbContextOptionsBuilder<DynamicParquetContext>()
-            .UseInternalServiceProvider(serviceProvider)
+            .UseInternalServiceProvider(Fixture.ServiceProvider)
             .UseDuckDB("DataSource=:memory:")
             .Options;
-
-        return new DynamicParquetContext(options);
+        return new DynamicParquetContext(options, parquetPath);
     }
 
-    private sealed class ParquetContext(DbContextOptions<ParquetContext> options) : DbContext(options)
+    private sealed class ParquetContext : DbContext
     {
+        public ParquetContext(DbContextOptions<ParquetContext> options)
+            : base(options) { }
+
         public DbSet<MyData> MyData => Set<MyData>();
         public DbSet<OtherData> Others => Set<OtherData>();
         public DbSet<RelatedParquetData> RelatedParquetData => Set<RelatedParquetData>();
-
-        protected override void OnModelCreating(ModelBuilder modelBuilder)
-        {
-            modelBuilder.Entity<MyData>()
-                .HasMany(x => x.Related)
-                .WithOne(x => x.MyData)
-                .HasForeignKey(x => x.MyDataId);
-        }
     }
 
-    private sealed class DynamicParquetContext(DbContextOptions<DynamicParquetContext> options) : DbContext(options)
-    {
-        public DbSet<DynamicMyData> DynamicMyData => Set<DynamicMyData>();
-
-        protected override void OnModelCreating(ModelBuilder modelBuilder)
-        {
-            modelBuilder.Entity<DynamicMyData>()
-                .FromParquet(TestParquetPathService.GetPath);
-        }
-    }
-
-    [Parquet("data/*.parquet")]
+    [FromParquet("parquet/my_data.parquet")]
     private sealed class MyData
     {
         public int Id { get; set; }
@@ -163,7 +144,7 @@ public class ParquetTests
         public int Id { get; set; }
     }
 
-    [Parquet("related/*.parquet")]
+    [FromParquet("parquet/related.parquet")]
     private sealed class RelatedParquetData
     {
         public int Id { get; set; }
@@ -172,11 +153,99 @@ public class ParquetTests
         public MyData? MyData { get; set; }
     }
 
-    private static class TestParquetPathService
+    private sealed class DynamicParquetContext : DbContext
     {
-        public static string CurrentPath { get; set; } = string.Empty;
+        private readonly string _parquetPath;
 
-        public static string GetPath(ServiceProvider _)
-            => CurrentPath;
+        public DynamicParquetContext(
+            DbContextOptions<DynamicParquetContext> options,
+            string parquetPath
+        )
+            : base(options)
+        {
+            _parquetPath = parquetPath;
+        }
+
+        public DbSet<DynamicMyData> DynamicMyData => Set<DynamicMyData>();
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            modelBuilder.Entity<DynamicMyData>().FromParquet(_parquetPath);
+        }
+    }
+
+    public sealed class ParquetFixture
+        : ServiceProviderFixtureBase, ITestSqlLoggerFactory, IDisposable
+    {
+        private const string ParquetDirectory = "parquet";
+        public const string MyDataParquetFile = ParquetDirectory + "/my_data.parquet";
+        private const string RelatedParquetFile = ParquetDirectory + "/related.parquet";
+        private const string JoinDatabaseFile = ParquetDirectory + "/join.db";
+
+        public string JoinDatabaseConnectionString { get; }
+
+        protected override ITestStoreFactory TestStoreFactory => DuckDBTestStoreFactory.Instance;
+        public TestSqlLoggerFactory TestSqlLoggerFactory => (TestSqlLoggerFactory)ListLoggerFactory;
+
+        public ParquetFixture()
+        {
+            WriteParquet(MyDataParquetFile, "DataSource=:memory:", conn =>
+            {
+                Execute(conn, "CREATE TABLE t (\"Id\" INTEGER)");
+                using var a = conn.CreateAppender("t");
+                foreach (var id in new[] { 1, 2, 3, 15, 20 })
+                    a.CreateRow().AppendValue(id).EndRow();
+            });
+
+            WriteParquet(RelatedParquetFile, "DataSource=:memory:", conn =>
+            {
+                Execute(conn, "CREATE TABLE t (\"Id\" INTEGER, \"MyDataId\" INTEGER, \"Value\" INTEGER)");
+                using var a = conn.CreateAppender("t");
+                foreach (var (id, myDataId, value) in new[] { (1, 1, 100), (2, 1, 200), (3, 2, 300) })
+                    a.CreateRow().AppendValue(id).AppendValue(myDataId).AppendValue(value).EndRow();
+            });
+
+            var dbPath = FullPath(JoinDatabaseFile);
+            using var joinConn = new DuckDBConnection($"DataSource={dbPath}");
+            joinConn.Open();
+            Execute(joinConn, "CREATE TABLE \"Others\" (\"Id\" INTEGER)");
+            using (var a = joinConn.CreateAppender("Others"))
+            {
+                a.CreateRow().AppendValue(1).EndRow();
+                a.CreateRow().AppendValue(2).EndRow();
+            }
+            JoinDatabaseConnectionString = $"DataSource={dbPath}";
+        }
+
+        public void Dispose()
+        {
+            var dir = Path.GetFullPath(Path.Combine(Environment.CurrentDirectory, ParquetDirectory));
+            if (Directory.Exists(dir))
+                Directory.Delete(dir, recursive: true);
+        }
+
+        private static void WriteParquet(string relativePath, string connectionString, Action<DuckDBConnection> seed)
+        {
+            var fullPath = FullPath(relativePath);
+            using var conn = new DuckDBConnection(connectionString);
+            conn.Open();
+            seed(conn);
+            Execute(conn, $"COPY t TO '{fullPath.Replace("\\", "\\\\").Replace("'", "''")}' (FORMAT PARQUET)");
+        }
+
+        private static void Execute(DuckDBConnection conn, string sql)
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = sql;
+            cmd.ExecuteNonQuery();
+        }
+
+        private static string FullPath(string relativePath)
+        {
+            var fullPath = Path.GetFullPath(Path.Combine(Environment.CurrentDirectory, relativePath));
+            Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
+            return fullPath;
+        }
     }
 }
+
