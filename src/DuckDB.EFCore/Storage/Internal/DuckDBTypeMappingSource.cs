@@ -127,6 +127,7 @@ public class DuckDBTypeMappingSource : RelationalTypeMappingSource
     protected override RelationalTypeMapping? FindMapping(in RelationalTypeMappingInfo mappingInfo)
     {
         var mapping = base.FindMapping(mappingInfo)
+                      ?? FindStructMapping(mappingInfo)?.Clone(mappingInfo)
                       ?? FindRawMapping(mappingInfo)?.Clone(mappingInfo)
                       ?? FindRowValueMapping(mappingInfo)?.Clone(mappingInfo);
 
@@ -303,6 +304,12 @@ public class DuckDBTypeMappingSource : RelationalTypeMappingSource
         => mappingInfo.ClrType is { } clrType
            && clrType.IsAssignableTo(typeof(ITuple))
             ? new DuckDBRowValueTypeMapping(clrType)
+            : null;
+
+    private static RelationalTypeMapping? FindStructMapping(RelationalTypeMappingInfo mappingInfo)
+        => mappingInfo is { ClrType: { } clrType, StoreTypeName: { } storeTypeName }
+           && storeTypeName.StartsWith("STRUCT", StringComparison.OrdinalIgnoreCase)
+            ? new DuckDBStructTypeMapping(clrType, storeTypeName)
             : null;
 
     private RelationalTypeMapping? FindRawMapping(RelationalTypeMappingInfo mappingInfo)
