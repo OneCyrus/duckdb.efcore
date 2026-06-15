@@ -25,17 +25,19 @@ public class DuckDBStructQueryTest : IClassFixture<DuckDBStructQueryTest.DuckDBS
             .OrderBy(e => e.Id)
             .Select(e => new
             {
-                e.Contact.Name,
-                e.Contact.Address.City
+                PrimaryName = e.Contact.Name,
+                BackupName = e.BackupContact.Name,
+                PrimaryCity = e.Contact.Address.City
             })
             .Single();
 
-        projected.Name.Should().Be("Ada");
-        projected.City.Should().Be("London");
+        projected.PrimaryName.Should().Be("Ada");
+        projected.BackupName.Should().Be("Grace");
+        projected.PrimaryCity.Should().Be("London");
 
         AssertSql(
             """
-            SELECT struct_extract(s."Contact", 'Name') AS "Name", struct_extract(struct_extract(s."Contact", 'Address'), 'City') AS "City"
+            SELECT struct_extract(s."Contact", 'Name') AS "PrimaryName", struct_extract(s."BackupContact", 'Name') AS "BackupName", struct_extract(struct_extract(s."Contact", 'Address'), 'City') AS "PrimaryCity"
             FROM "StructRows" AS s
             ORDER BY s."Id"
             """);
@@ -57,8 +59,11 @@ public class DuckDBStructQueryTest : IClassFixture<DuckDBStructQueryTest.DuckDBS
         {
             context.Database.ExecuteSqlRaw(
                 """
-                INSERT INTO "StructRows" ("Id", "Contact")
-                VALUES (1, struct_pack(Name := 'Ada', Address := struct_pack(City := 'London', Zip := 12345)))
+                INSERT INTO "StructRows" ("Id", "Contact", "BackupContact")
+                VALUES (
+                    1,
+                    struct_pack(Name := 'Ada', Address := struct_pack(City := 'London', Zip := 12345)),
+                    struct_pack(Name := 'Grace', Address := struct_pack(City := 'Arlington', Zip := 22207)))
                 """);
 
             return Task.CompletedTask;
@@ -76,6 +81,8 @@ public class DuckDBStructQueryTest : IClassFixture<DuckDBStructQueryTest.DuckDBS
                 b.HasKey(e => e.Id);
                 b.Property(e => e.Contact)
                     .HasColumnType("STRUCT(Name VARCHAR, Address STRUCT(City VARCHAR, Zip INTEGER))");
+                b.Property(e => e.BackupContact)
+                    .HasColumnType("STRUCT(Name VARCHAR, Address STRUCT(City VARCHAR, Zip INTEGER))");
             });
         }
     }
@@ -84,6 +91,7 @@ public class DuckDBStructQueryTest : IClassFixture<DuckDBStructQueryTest.DuckDBS
     {
         public int Id { get; set; }
         public ContactStruct Contact { get; set; }
+        public ContactStruct BackupContact { get; set; }
     }
 
     public readonly record struct ContactStruct(string Name, AddressStruct Address);
